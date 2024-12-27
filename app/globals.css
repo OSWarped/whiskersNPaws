@@ -1,0 +1,12 @@
+/* Avoid overwriting Material-UI defaults */
+html, body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Retain styles for specific components, if necessary */
+a {
+  text-decoration: none;
+  color: inherit;
+}
