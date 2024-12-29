@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "seed": "node seed.js"
@@ -23,7 +23,6 @@
     "next": "15.1.2",
     "nodemailer": "^6.9.16",
     "react": "^19.0.0",
-    "react-big-calendar": "^1.17.1",
     "react-calendar": "^5.1.0",
     "react-dom": "^19.0.0"
   },
