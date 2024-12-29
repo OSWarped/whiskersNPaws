@@ -1,0 +1,64 @@
+/* General Calendar Size */
+.react-calendar {
+    max-width: 100%;
+    width: 800px;
+    margin: 0 auto;
+    font-family: Arial, sans-serif;
+    font-size: 1.2rem;
+  }
+  
+  /* Borders Around Days */
+  .react-calendar__tile {
+    border: 1px solid #ccc; /* Add visible borders around each day */
+    margin: 2px; /* Add spacing between tiles */
+    padding: 10px; /* Ensure enough padding for clickable area */
+    border-radius: 5px; /* Optional: Rounded corners for tiles */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 70px; /* Ensure uniform height for all tiles */
+    box-sizing: border-box; /* Ensure padding doesn't affect size */
+  }
+  
+  /* Highlight Booked Days */
+  .booked-day {
+    background-color: #007bff !important; /* Blue background for booked days */
+    color: white !important; /* White text for contrast */
+    font-weight: bold;
+    border-color: #0056b3 !important; /* Darker border for booked days */
+  }
+  
+  /* Hover Effect for Days */
+  .react-calendar__tile:hover {
+    background-color: #f0f8ff; /* Light blue hover effect */
+    border-color: #00aaff; /* Highlight border on hover */
+    cursor: pointer;
+  }
+  
+  /* Calendar Navigation Buttons */
+  .react-calendar__navigation button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  
+  .react-calendar__navigation button:hover {
+    background: #0056b3;
+  }
+  
+  /* Calendar Headers */
+  .react-calendar__month-view__weekdays {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 1rem;
+    color: #555;
+  }
+  
+  /* Calendar Weekend Days */
+  .react-calendar__month-view__days__day--weekend {
+    color: red; /* Optional: Highlight weekends in red */
+  }
+  

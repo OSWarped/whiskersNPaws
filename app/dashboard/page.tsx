@@ -15,6 +15,7 @@ import {
   TextField,
   Alert,
 } from '@mui/material';
+import Cookies from 'js-cookie';
 
 interface User {
   id: number;
@@ -58,34 +59,53 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const token = Cookies.get('authToken') || localStorage.getItem('jwt') || undefined;
+
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        // Fetch user info
         const userResponse = await fetch('/api/auth/me', {
           method: 'GET',
-          credentials: 'include',
+          headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          setUser(userData);
+        if (!userResponse.ok) {
+          throw new Error('Failed to fetch user');
+        }
 
-          // Fetch pets for the user
-          const petsResponse = await fetch(`/api/pets/${userData.id}`);
-          if (petsResponse.ok) {
-            const petData = await petsResponse.json();
-            setPets(petData);
-          }
+        const userData = await userResponse.json();
+        setUser(userData);
 
-          // Fetch reservations for the user
-          const reservationsResponse = await fetch(`/api/reservations/${userData.id}`);
-          if (reservationsResponse.ok) {
-            const reservationData = await reservationsResponse.json();
-            setReservations(reservationData);
-          }
+        // Fetch pets
+        const petsResponse = await fetch('/api/pets/me', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (petsResponse.ok) {
+          const petsData = await petsResponse.json();
+          setPets(petsData);
         } else {
-          router.push('/login'); // Redirect if not authenticated
+          console.error('Failed to fetch pets:', await petsResponse.json());
+        }
+
+        // Fetch reservations
+        const reservationsResponse = await fetch('/api/reservations', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (reservationsResponse.ok) {
+          const reservationsData = await reservationsResponse.json();
+          setReservations(reservationsData);
+        } else {
+          console.error('Failed to fetch reservations:', await reservationsResponse.json());
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        router.push('/login'); // Redirect on error
+        router.push('/login');
       } finally {
         setLoading(false);
       }
@@ -105,9 +125,15 @@ export default function DashboardPage() {
     }
 
     try {
+      const token = Cookies.get('authToken') || localStorage.getItem('jwt');
+      if (!token) {
+        setError('User not authenticated.');
+        return;
+      }
+
       const response = await fetch('/api/pets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ...formData, userId: user?.id }),
       });
 
@@ -119,7 +145,7 @@ export default function DashboardPage() {
 
       const newPet = await response.json();
       setPets((prevPets) => [...prevPets, newPet]);
-      setFormData({ name: '', type: '', breed: '', specialNeeds: '' }); // Reset form
+      setFormData({ name: '', type: '', breed: '', specialNeeds: '' });
     } catch (error) {
       console.error('Error adding pet:', error);
       setError('An error occurred. Please try again.');
@@ -172,7 +198,6 @@ export default function DashboardPage() {
                 ))}
               </List>
             )}
-            {/* Add Pet Section */}
             <Box sx={{ mt: 3 }}>
               <Typography variant="h6" gutterBottom>
                 Add a Pet
@@ -253,7 +278,6 @@ export default function DashboardPage() {
                 ))}
               </List>
             )}
-            {/* Button to Add New Reservation */}
             <Button
               variant="contained"
               color="primary"

@@ -1,5 +1,5 @@
 'use client';
-
+import Cookies from 'js-cookie'; // Ensure you have this installed
 import React, { useState } from 'react';
 import { Box, TextField, Button, Typography, Alert, CircularProgress } from '@mui/material';
 import { useRouter } from 'next/navigation';
@@ -34,8 +34,16 @@ export default function LoginPage() {
       console.log('Login API Response:', data);
   
       if (data.token) {
-        localStorage.setItem('jwt', data.token); // Store the JWT
-        router.push('/dashboard'); // Redirect to the dashboard
+        // Store the token in a cookie
+        Cookies.set('authToken', data.token, { expires: 1 }); // Expires in 1 day
+  
+        // Store the token in localStorage as a fallback
+        localStorage.setItem('jwt', data.token);
+  
+        console.log('Token saved to cookie and localStorage:', data.token);
+  
+        // Redirect to the dashboard
+        router.push('/dashboard');
       } else {
         setError('Login response missing token.');
       }
@@ -46,6 +54,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+  
   
 
   return (
