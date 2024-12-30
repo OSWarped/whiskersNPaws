@@ -8,13 +8,14 @@ import {
   Grid,
   Paper,
   Button,
-  List,
-  ListItem,
-  Divider,
-  CircularProgress,
   TextField,
-  Alert,
+  CircularProgress,
+  IconButton,
+  Chip,
+  Divider,
+  Modal,
 } from '@mui/material';
+import { Delete } from '@mui/icons-material';
 import Cookies from 'js-cookie';
 
 interface User {
@@ -53,6 +54,7 @@ export default function DashboardPage() {
     breed: '',
     specialNeeds: '',
   });
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const router = useRouter();
 
@@ -99,7 +101,13 @@ export default function DashboardPage() {
 
         if (reservationsResponse.ok) {
           const reservationsData = await reservationsResponse.json();
-          setReservations(reservationsData);
+
+          // Sort reservations by start date (newest first)
+          const sortedReservations = reservationsData.sort(
+            (a: Reservation, b: Reservation) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+          );
+
+          setReservations(sortedReservations);
         } else {
           console.error('Failed to fetch reservations:', await reservationsResponse.json());
         }
@@ -146,11 +154,85 @@ export default function DashboardPage() {
       const newPet = await response.json();
       setPets((prevPets) => [...prevPets, newPet]);
       setFormData({ name: '', type: '', breed: '', specialNeeds: '' });
+      setError('');
+      setIsModalOpen(false); // Close the modal
     } catch (error) {
       console.error('Error adding pet:', error);
       setError('An error occurred. Please try again.');
     }
   };
+
+  const handleRemovePet = async (petId: number) => {
+    try {
+      const token = Cookies.get('authToken') || localStorage.getItem('jwt');
+      if (!token) {
+        setError('User not authenticated.');
+        return;
+      }
+
+      const response = await fetch(`/api/pets/${petId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to remove pet.');
+        return;
+      }
+
+      setPets((prevPets) => prevPets.filter((pet) => pet.id !== petId));
+    } catch (error) {
+      console.error('Error removing pet:', error);
+      setError('An error occurred. Please try again.');
+    }
+  };
+
+  const renderReservations = (reservations: Reservation[], title: string, color: string) => (
+    <Box sx={{ mt: 4 }}>
+      <Typography variant="h5" gutterBottom sx={{ color }}>
+        {title}
+      </Typography>
+      {reservations.length === 0 ? (
+        <Typography>No {title.toLowerCase()}.</Typography>
+      ) : (
+        <Grid container spacing={2}>
+          {reservations.map((reservation) => (
+            <Grid item xs={12} md={6} key={reservation.id}>
+              <Paper elevation={3} sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  {new Date(reservation.startDate).toLocaleDateString()}
+                </Typography>
+                <Typography><strong>Status:</strong> {reservation.status}</Typography>
+                <Typography><strong>Total Price:</strong> ${reservation.totalPrice.toFixed(2)}</Typography>
+                <Typography>
+                  <strong>Pets:</strong>
+                </Typography>
+                {reservation.pets.map((pet) => (
+                  <Typography key={pet.id} sx={{ ml: 2 }}>
+                    - <strong>Name:</strong> {pet.name}
+                    <br />
+                    - <strong>Type:</strong> {pet.type}{pet.breed ? ` - ${pet.breed}` : ''}
+                    <br />
+                    - <strong>Special Needs:</strong> {pet.specialNeeds || 'None'}
+                  </Typography>
+                ))}
+                <Chip
+                  label={reservation.status}
+                  color={reservation.status === 'Completed' ? 'success' : 'primary'}
+                  sx={{ mt: 2 }}
+                />
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+    </Box>
+  );
+
+  const now = new Date();
+  const upcomingReservations = reservations.filter((res) => new Date(res.startDate) > now);
+  const pastReservations = reservations.filter((res) => new Date(res.endDate) < now);
 
   if (loading) {
     return (
@@ -173,122 +255,131 @@ export default function DashboardPage() {
         Welcome, {user?.firstName} {user?.lastName}!
       </Typography>
 
-      <Grid container spacing={4}>
-        {/* Pets Section */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={3} sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Your Pets
-            </Typography>
-            {pets.length === 0 ? (
-              <Typography>No pets added yet.</Typography>
-            ) : (
-              <List>
-                {pets.map((pet) => (
-                  <Box key={pet.id}>
-                    <ListItem>
-                      <Typography>
-                        <strong>Name:</strong> {pet.name} | <strong>Type:</strong> {pet.type}{' '}
-                        {pet.breed ? `| Breed: ${pet.breed}` : ''}{' '}
-                        {pet.specialNeeds ? `| Special Needs: ${pet.specialNeeds}` : ''}
-                      </Typography>
-                    </ListItem>
-                    <Divider />
-                  </Box>
-                ))}
-              </List>
-            )}
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Add a Pet
+      {/* Pet Listing */}
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" gutterBottom>
+          Your Pets
+        </Typography>
+        {pets.length === 0 ? (
+          <Typography>No pets added yet.</Typography>
+        ) : (
+          pets.map((pet) => (
+            <Paper key={pet.id} sx={{ p: 2, mb: 2 }}>
+              <Typography>
+                <strong>Name:</strong> {pet.name}
               </Typography>
-              {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-              <TextField
-                label="Pet Name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                fullWidth
-                required
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                label="Pet Type"
-                name="type"
-                value={formData.type}
-                onChange={handleInputChange}
-                fullWidth
-                required
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                label="Breed (Optional)"
-                name="breed"
-                value={formData.breed}
-                onChange={handleInputChange}
-                fullWidth
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                label="Special Needs (Optional)"
-                name="specialNeeds"
-                value={formData.specialNeeds}
-                onChange={handleInputChange}
-                fullWidth
-                sx={{ mb: 2 }}
-              />
-              <Button variant="contained" color="primary" onClick={handleAddPet}>
-                Add Pet
-              </Button>
-            </Box>
-          </Paper>
-        </Grid>
+              <Typography>
+                <strong>Type:</strong> {pet.type}{pet.breed ? ` - ${pet.breed}` : ''}
+              </Typography>
+              <Typography>
+                <strong>Special Needs:</strong> {pet.specialNeeds || 'None'}
+              </Typography>
+              <IconButton
+                onClick={() => handleRemovePet(pet.id)}
+                color="error"
+                sx={{ mt: 1 }}
+              >
+                <Delete />
+              </IconButton>
+            </Paper>
+          ))
+        )}
 
-        {/* Reservations Section */}
-        <Grid item xs={12} md={6}>
-          <Paper elevation={3} sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Your Reservations
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => setIsModalOpen(true)}
+          sx={{ mt: 2 }}
+        >
+          Add New Pet
+        </Button>
+      </Box>
+
+      <Divider sx={{ my: 4 }} />
+
+      {/* Add Reservation Button */}
+      <Button
+        variant="contained"
+        color="primary"
+        href="/calendar"
+        sx={{ mb: 4 }}
+      >
+        Add New Reservation
+      </Button>
+
+      {/* Add Pet Modal */}
+      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            bgcolor: 'background.paper',
+            p: 4,
+            borderRadius: 2,
+            boxShadow: 24,
+            width: 400,
+          }}
+        >
+          <Typography variant="h6" gutterBottom>
+            Add a New Pet
+          </Typography>
+          {error && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {error}
             </Typography>
-            {reservations.length === 0 ? (
-              <Typography>No Reservations.</Typography>
-            ) : (
-              <List>
-                {reservations.map((reservation) => (
-                  <Box key={reservation.id}>
-                    <ListItem>
-                      <Typography>
-                        <strong>Dates:</strong>{' '}
-                        {new Date(reservation.startDate).toLocaleDateString()} -{' '}
-                        {new Date(reservation.endDate).toLocaleDateString()} |{' '}
-                        <strong>Status:</strong> {reservation.status} | <strong>Total Price:</strong>{' '}
-                        ${reservation.totalPrice.toFixed(2)}
-                      </Typography>
-                    </ListItem>
-                    {reservation.pets && (
-                      <ListItem>
-                        <Typography>
-                          <strong>Pets:</strong>{' '}
-                          {reservation.pets.map((pet) => `${pet.name} (${pet.type})`).join(', ')}
-                        </Typography>
-                      </ListItem>
-                    )}
-                    <Divider />
-                  </Box>
-                ))}
-              </List>
-            )}
-            <Button
-              variant="contained"
-              color="primary"
-              href="/calendar"
-              sx={{ mt: 2 }}
-            >
-              Add New Reservation
-            </Button>
-          </Paper>
-        </Grid>
-      </Grid>
+          )}
+          <TextField
+            label="Name"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            fullWidth
+            required
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="Type"
+            name="type"
+            value={formData.type}
+            onChange={handleInputChange}
+            fullWidth
+            required
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="Breed (Optional)"
+            name="breed"
+            value={formData.breed}
+            onChange={handleInputChange}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="Special Needs (Optional)"
+            name="specialNeeds"
+            value={formData.specialNeeds}
+            onChange={handleInputChange}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleAddPet}
+            sx={{ mt: 2 }}
+          >
+            Save
+          </Button>
+        </Box>
+      </Modal>
+
+      {/* Upcoming Reservations */}
+      {renderReservations(upcomingReservations, 'Upcoming Reservations', '#28a745')}
+
+      {/* Past Reservations */}
+      {renderReservations(pastReservations, 'Past Reservations', '#dc3545')}
     </Box>
   );
 }

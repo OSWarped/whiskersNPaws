@@ -1,25 +1,43 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Box, Typography, List, ListItem, Divider, Button, Alert } from '@mui/material';
+import {
+  Box,
+  Typography,
+  List,
+  ListItem,
+  Button,
+  Alert,
+  Paper,
+  Grid,
+} from '@mui/material';
 import moment from 'moment';
-
-interface Booking {
-  title: string;
-  start: Date;
-  totalCost: number;
-  petIds?: number[];
-}
 
 interface Pet {
   id: number;
   name: string;
   type: string;
+  breed?: string;
+  specialNeeds?: string;
+}
+
+interface Booking {
+  date: string;
+  service: string;
+  addOns: string[];
+  pets: Pet[];
+  totalCost: number;
+  details: {
+    id: number;
+    reservationId: number;
+    addOnId: string | null;
+    price: number;
+    quantity: number;
+  }[];
 }
 
 export default function CheckoutPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [pets, setPets] = useState<Pet[]>([]);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,46 +46,13 @@ export default function CheckoutPage() {
     // Fetch bookings from localStorage
     const storedBookings = JSON.parse(localStorage.getItem('bookings') || '[]');
     setBookings(storedBookings);
-
-    // Fetch pets associated with the user
-    const fetchPets = async () => {
-      try {
-        const token = localStorage.getItem('jwt');
-        if (!token) {
-          console.error('No JWT found. Please log in.');
-          return;
-        }
-
-        const response = await fetch('/api/pets/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (response.ok) {
-          const petData = await response.json();
-          setPets(petData);
-        } else {
-          console.error('Failed to fetch pets:', await response.json());
-        }
-      } catch (error) {
-        console.error('Error fetching pets:', error);
-      }
-    };
-
-    fetchPets();
   }, []);
-
-  const findPetNames = (petIds?: number[]) => {
-    if (!petIds) return 'No pets selected';
-    return petIds
-      .map((id) => pets.find((pet) => pet.id === id)?.name || `Pet ID: ${id}`)
-      .join(', ');
-  };
 
   const handleMockPayment = async () => {
     setLoading(true);
     setSuccessMessage('');
     setErrorMessage('');
-  
+
     try {
       const token = localStorage.getItem('jwt');
       if (!token) {
@@ -75,10 +60,9 @@ export default function CheckoutPage() {
         setLoading(false);
         return;
       }
-  
-      // Ensure correct structure
+
       const payload = { bookings };
-  
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: {
@@ -87,11 +71,11 @@ export default function CheckoutPage() {
         },
         body: JSON.stringify(payload),
       });
-  
+
       if (response.ok) {
         setSuccessMessage('Reservations successfully created!');
-        localStorage.removeItem('bookings'); // Clear the bookings
-        setBookings([]); // Clear the UI
+        localStorage.removeItem('bookings');
+        setBookings([]);
       } else {
         const errorData = await response.json();
         setErrorMessage(errorData.message || 'Failed to create reservations.');
@@ -103,11 +87,10 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
-  
 
   return (
     <Box sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom align="center">
         Checkout
       </Typography>
       {successMessage && (
@@ -120,41 +103,97 @@ export default function CheckoutPage() {
           {errorMessage}
         </Alert>
       )}
-      <List>
-        {bookings.map((booking, index) => (
-          <Box key={index}>
-            <ListItem>
-              <Typography variant="body1">
-                <strong>{booking.title}</strong>
-              </Typography>
-            </ListItem>
-            <ListItem>
-              <Typography variant="body2">
-                Date: {moment(booking.start).format('MM/DD/YYYY')}
-              </Typography>
-            </ListItem>
-            <ListItem>
-              <Typography variant="body2">
-                Pets: {findPetNames(booking.petIds)}
-              </Typography>
-            </ListItem>
-            <ListItem>
-              <Typography variant="body2">
-                Total Cost: ${booking.totalCost.toFixed(2)}
-              </Typography>
-            </ListItem>
-            <Divider />
-          </Box>
-        ))}
-      </List>
+      {bookings.length === 0 ? (
+        <Typography variant="body1" align="center">
+          No bookings to display.
+        </Typography>
+      ) : (
+        bookings.map((booking, index) => (
+          <Paper
+            key={index}
+            elevation={3}
+            sx={{
+              p: 3,
+              mb: 3,
+              borderRadius: 2,
+              backgroundColor: '#f9f9f9',
+            }}
+          >
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="h6" gutterBottom>
+                  Date
+                </Typography>
+                <Typography variant="body1">
+                  {moment(booking.date).format('MMMM Do, YYYY')}
+                </Typography>
+              </Grid>
+               
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>
+                  Pets
+                </Typography>
+                <List disablePadding sx={{ pl: 2 }}>
+                  {booking.pets.length > 0 ? (
+                    booking.pets.map((pet) => (
+                      <ListItem
+                        key={pet.id}
+                        sx={{
+                          display: 'block',
+                          pl: 0,
+                          pb: 2,
+                        }}
+                      >
+                        <Typography variant="body2">
+                          <strong>Name:</strong> {pet.name}
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Type:</strong> {pet.type}
+                          {pet.breed ? ` - ${pet.breed}` : ''}
+                        </Typography>
+                        {pet.specialNeeds && (
+                          <Typography variant="body2">
+                            <strong>Special Needs:</strong> {pet.specialNeeds}
+                          </Typography>
+                        )}
+                      </ListItem>
+                    ))
+                  ) : (
+                    <ListItem sx={{ display: 'block', pl: 0 }}>
+                      <Typography variant="body2">No pets selected</Typography>
+                    </ListItem>
+                  )}
+                </List>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>
+                  Add-Ons
+                </Typography>
+                <Typography variant="body1">
+                  {booking.addOns.length > 0 ? booking.addOns.join(', ') : 'No Add-Ons'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>
+                  Total Cost
+                </Typography>
+                <Typography variant="body1">
+                  ${booking.totalCost.toFixed(2)}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+        ))
+      )}
       <Button
         variant="contained"
         color="primary"
-        sx={{ mt: 4 }}
+        fullWidth
+        sx={{ mt: 4, py: 2 }}
         onClick={handleMockPayment}
         disabled={loading || bookings.length === 0}
       >
-        {loading ? 'Processing...' : 'Mock Payment'}
+        {loading ? 'Processing...' : 'Confirm and Pay'}
       </Button>
     </Box>
   );

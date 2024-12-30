@@ -10,6 +10,15 @@ interface DecodedToken {
   exp: number;
 }
 
+type Pet = {
+  id: number;
+  name: string;
+  type: string;
+  breed?: string;
+  specialNeeds?: string;
+};
+
+
 // GET handler
 export async function GET(request: NextRequest) {
   try {
@@ -55,6 +64,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST handler
+// POST handler
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');
@@ -77,7 +87,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { bookings }: { bookings: { date: string; totalCost: number; service: number; addOns: number[]; pets: number[] }[] } = await request.json();
+    const { bookings }: { bookings: { date: string; totalCost: number; service: string; addOns: string[]; pets: Pet[] }[] } = await request.json();
 
     if (!bookings || !Array.isArray(bookings) || bookings.length === 0) {
       return NextResponse.json(
@@ -95,6 +105,9 @@ export async function POST(request: NextRequest) {
           throw new Error('Invalid booking data');
         }
 
+        // Extract pet IDs from the pets array
+        const petIds = booking.pets.map((pet) => pet.id);
+
         // Create the reservation
         const reservation = await prisma.reservation.create({
           data: {
@@ -103,7 +116,7 @@ export async function POST(request: NextRequest) {
             startDate: new Date(booking.date),
             endDate: new Date(booking.date), // Assuming single-day reservations
             pets: {
-              connect: booking.pets.map((id) => ({ id })),
+              connect: petIds.map((id) => ({ id })),
             },
             status: 'Confirmed',
           },
@@ -113,15 +126,43 @@ export async function POST(request: NextRequest) {
         const detailsData = [
           {
             reservationId: reservation.id,
-            serviceId: booking.service,
+            serviceId: Number(booking.service), // Ensure serviceId is a number
             price: booking.totalCost, // Include the base service price
           },
           ...booking.addOns.map((addOnId) => ({
             reservationId: reservation.id,
-            addOnId,
-            price: availableAddOns.find((a) => a.id === addOnId)?.price || 0,
+            addOnId: Number(addOnId), // Convert addOnId to a number
+            price: availableAddOns.find((a) => a.id === Number(addOnId))?.price || 0,
           })),
         ];
+        
+        // Ensure detailsData is properly typed
+        const formattedDetailsData = detailsData.map((detail) => {
+          if ('serviceId' in detail) {
+            return {
+              ...detail,
+              serviceId: detail.serviceId, // serviceId exists in this case
+              addOnId: undefined, // Prisma requires undefined for missing fields
+            };
+          } else if ('addOnId' in detail) {
+            return {
+              ...detail,
+              serviceId: undefined, // Prisma requires undefined for missing fields
+              addOnId: detail.addOnId, // addOnId exists in this case
+            };
+          }
+          throw new Error('Invalid detail object'); // Fallback for unexpected cases
+        });
+        
+        await prisma.reservationDetail.createMany({
+          data: formattedDetailsData,
+        });
+        
+        
+        await prisma.reservationDetail.createMany({
+          data: formattedDetailsData,
+        });
+        
 
         await prisma.reservationDetail.createMany({
           data: detailsData,
@@ -153,5 +194,4 @@ export async function POST(request: NextRequest) {
       );
     }
   }
-  
 }
