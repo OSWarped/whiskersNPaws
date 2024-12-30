@@ -16,7 +16,7 @@ import 'react-calendar/dist/Calendar.css';
 import './CustomCalendar.css';
 
 interface Booking {
-  date: string;
+  startDate: string;
   service: string;
   addOns: string[];
   pets: Pet[];
@@ -95,18 +95,18 @@ export default function CalendarPage() {
           reservationsRes.json(),
         ]);
 
-        setServices(servicesData);
-        setAddOns(addOnsData);
-        setPets(petsData);
+        setServices(servicesData as Service[]);
+        setAddOns(addOnsData as AddOn[]);
+        setPets(petsData as Pet[]);
 
-        const formattedBookings = reservationsData.map((res: Booking) => {
+        const formattedBookings: Booking[] = (reservationsData as Booking[]).map((res) => {
           const serviceDetail = res.details.find((detail) => detail.serviceId);
           const addOnDetails = res.details.filter((detail) => detail.addOnId);
-        
+
           return {
-            date: new Date(res.date).toISOString(),
+            startDate: res.startDate,
             service: serviceDetail?.serviceId || '',
-            addOns: addOnDetails.map((detail) => detail.addOnId?.toString() || ''),
+            addOns: addOnDetails.map((detail) => detail.addOnId || ''),
             pets: res.pets.map((pet) => ({
               id: pet.id,
               name: pet.name,
@@ -114,24 +114,20 @@ export default function CalendarPage() {
               breed: pet.breed || '',
               specialNeeds: pet.specialNeeds || '',
             })),
-            totalCost: res.totalCost,
+            totalCost: res.totalCost || 0,
             details: res.details.map((detail) => ({
               id: detail.id,
               reservationId: detail.reservationId,
-              serviceId: detail.serviceId || '',
-              addOnId: detail.addOnId || null,
+              serviceId: detail.serviceId,
+              addOnId: detail.addOnId,
               price: detail.price,
               quantity: detail.quantity,
             })),
           };
         });
-        
 
-        // Filter out null values from invalid reservations
-        const validBookings = formattedBookings.filter((booking : Booking) => booking !== null);
-
-        setExistingBookings(validBookings as Booking[]); // Store existing bookings
-        setBookings(validBookings as Booking[]); // Initialize bookings with existing ones
+        setExistingBookings(formattedBookings);
+        setBookings(formattedBookings);
       } catch (error) {
         console.error('Error fetching resources:', error);
         setError('Unable to load resources. Please try again.');
@@ -140,13 +136,14 @@ export default function CalendarPage() {
 
     fetchResources();
   }, []);
+  
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
   
     // Find a booking for the selected date
     const booking = bookings.find(
-      (b) => new Date(b.date).toDateString() === date.toDateString()
+      (b) => new Date(b.startDate).toDateString() === date.toDateString()
     );
   
     if (booking) {
@@ -154,7 +151,7 @@ export default function CalendarPage() {
       const service = booking.details.find((detail) => detail.serviceId)?.serviceId || null;
       const addOns = booking.details
         .filter((detail) => detail.addOnId)
-        .map((detail) => detail.addOnId as string);
+        .map((detail) => detail.addOnId!);
   
       // Populate modal with booking details
       setSelectedService(service);
@@ -174,6 +171,7 @@ export default function CalendarPage() {
     // Open the modal
     setIsModalOpen(true);
   };
+  
   
 
   const handleSaveBooking = () => {
@@ -213,7 +211,7 @@ export default function CalendarPage() {
     ];
 
     const newBooking: Booking = {
-      date: selectedDate.toISOString(),
+      startDate: selectedDate.toISOString(),
       service: selectedService,
       addOns: selectedAddOns,
       pets: selectedPets.map((id) => pets.find((pet) => pet.id === id)!),
@@ -223,7 +221,7 @@ export default function CalendarPage() {
 
     setBookings((prev) => {
       const existingBookingIndex = prev.findIndex(
-        (b) => new Date(b.date).toISOString() === newBooking.date
+        (b) => new Date(b.startDate).toISOString() === newBooking.startDate
       );
       if (existingBookingIndex !== -1) {
         const updatedBookings = [...prev];
@@ -242,7 +240,7 @@ export default function CalendarPage() {
       (booking) =>
         !existingBookings.some(
           (existing) =>
-            existing.date === booking.date &&
+            existing.startDate === booking.startDate &&
             existing.service === booking.service &&
             JSON.stringify(existing.addOns) === JSON.stringify(booking.addOns) &&
             JSON.stringify(existing.pets) === JSON.stringify(booking.pets)
@@ -269,7 +267,7 @@ export default function CalendarPage() {
       <Calendar
         onClickDay={handleDateClick}
         tileClassName={({ date }) => {
-          const booking = bookings.find((b) => new Date(b.date).toDateString() === date.toDateString());
+          const booking = bookings.find((b) => new Date(b.startDate).toDateString() === date.toDateString());
           if (booking) {
             return date < new Date() ? 'past-reservation' : 'future-reservation';
           }
