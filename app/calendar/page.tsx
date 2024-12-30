@@ -12,15 +12,23 @@ import {
   Alert,
 } from '@mui/material';
 import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css'; // Ensure this is included
-import './CustomCalendar.css'; // Custom styles for booked-day
+import 'react-calendar/dist/Calendar.css';
+import './CustomCalendar.css';
 
 interface Booking {
-  date: string; // Use string for date comparison
+  date: string;
   service: string;
   addOns: string[];
-  pets: number[];
+  pets: Pet[];
   totalCost: number;
+  details: {
+    id: number;
+    reservationId: number;
+    serviceId: string;
+    addOnId: string | null;
+    price: number;
+    quantity: number;
+  }[];
 }
 
 interface Service {
@@ -39,6 +47,8 @@ interface Pet {
   id: number;
   name: string;
   type: string;
+  breed?: string;
+  specialNeeds?: string;
 }
 
 export default function CalendarPage() {
@@ -52,36 +62,76 @@ export default function CalendarPage() {
   const [selectedPets, setSelectedPets] = useState<number[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [existingBookings, setExistingBookings] = useState<Booking[]>([]);
+
   const router = useRouter();
 
-  // Fetch resources (services, add-ons, pets)
+  // Fetch resources
   useEffect(() => {
     const fetchResources = async () => {
       try {
         const token = localStorage.getItem('jwt');
         if (!token) throw new Error('Authorization token not found');
 
-        const [servicesRes, addOnsRes, petsRes] = await Promise.all([
+        const [servicesRes, addOnsRes, petsRes, reservationsRes] = await Promise.all([
           fetch('/api/services'),
           fetch('/api/addons'),
           fetch('/api/pets/me', {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch('/api/reservations', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
-        if (!servicesRes.ok || !addOnsRes.ok || !petsRes.ok) {
+        if (!servicesRes.ok || !addOnsRes.ok || !petsRes.ok || !reservationsRes.ok) {
           throw new Error('Failed to fetch one or more resources');
         }
 
-        const [servicesData, addOnsData, petsData] = await Promise.all([
+        const [servicesData, addOnsData, petsData, reservationsData] = await Promise.all([
           servicesRes.json(),
           addOnsRes.json(),
           petsRes.json(),
+          reservationsRes.json(),
         ]);
 
         setServices(servicesData);
         setAddOns(addOnsData);
         setPets(petsData);
+
+        const formattedBookings = reservationsData.map((res: Booking) => {
+          const serviceDetail = res.details.find((detail) => detail.serviceId);
+          const addOnDetails = res.details.filter((detail) => detail.addOnId);
+        
+          return {
+            date: new Date(res.date).toISOString(),
+            service: serviceDetail?.serviceId || '',
+            addOns: addOnDetails.map((detail) => detail.addOnId?.toString() || ''),
+            pets: res.pets.map((pet) => ({
+              id: pet.id,
+              name: pet.name,
+              type: pet.type,
+              breed: pet.breed || '',
+              specialNeeds: pet.specialNeeds || '',
+            })),
+            totalCost: res.totalCost,
+            details: res.details.map((detail) => ({
+              id: detail.id,
+              reservationId: detail.reservationId,
+              serviceId: detail.serviceId || '',
+              addOnId: detail.addOnId || null,
+              price: detail.price,
+              quantity: detail.quantity,
+            })),
+          };
+        });
+        
+
+        // Filter out null values from invalid reservations
+        const validBookings = formattedBookings.filter((booking : Booking) => booking !== null);
+
+        setExistingBookings(validBookings as Booking[]); // Store existing bookings
+        setBookings(validBookings as Booking[]); // Initialize bookings with existing ones
       } catch (error) {
         console.error('Error fetching resources:', error);
         setError('Unable to load resources. Please try again.');
@@ -93,48 +143,87 @@ export default function CalendarPage() {
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
-
+  
+    // Find a booking for the selected date
     const booking = bookings.find(
-      (b) => b.date === date.toDateString()
+      (b) => new Date(b.date).toDateString() === date.toDateString()
     );
+  
     if (booking) {
-      setSelectedService(booking.service);
-      setSelectedAddOns(booking.addOns);
-      setSelectedPets(booking.pets);
+      // Extract service and add-ons from details
+      const service = booking.details.find((detail) => detail.serviceId)?.serviceId || null;
+      const addOns = booking.details
+        .filter((detail) => detail.addOnId)
+        .map((detail) => detail.addOnId as string);
+  
+      // Populate modal with booking details
+      setSelectedService(service);
+      setSelectedAddOns(addOns);
+      setSelectedPets(booking.pets.map((pet) => pet.id));
     } else {
+      // Clear modal fields for a new reservation
       setSelectedService(null);
       setSelectedAddOns([]);
       setSelectedPets([]);
     }
-
+  
+    // Determine if the reservation is editable (only future dates are editable)
+    const isEditable = date >= new Date();
+    setError(!isEditable ? 'Past reservations cannot be edited.' : null);
+  
+    // Open the modal
     setIsModalOpen(true);
   };
+  
 
   const handleSaveBooking = () => {
     if (!selectedDate || !selectedService || selectedPets.length === 0) {
       setError('Please select a service and at least one pet.');
       return;
     }
-  
-    // Calculate total cost
+
     const service = services.find((s) => s.id === selectedService);
     const addOnsCost = selectedAddOns.reduce((sum, addOnId) => {
       const addOn = addOns.find((a) => a.id === addOnId);
       return sum + (addOn?.price || 0);
     }, 0);
+
     const totalCost = (service?.basePricePerDay || 0) + addOnsCost;
-  
+
+    const details = [
+      {
+        id: Math.random(),
+        reservationId: 0,
+        serviceId: selectedService,
+        addOnId: null,
+        price: service?.basePricePerDay || 0,
+        quantity: 1,
+      },
+      ...selectedAddOns.map((addOnId) => {
+        const addOn = addOns.find((a) => a.id === addOnId);
+        return {
+          id: Math.random(),
+          reservationId: 0,
+          serviceId: '',
+          addOnId,
+          price: addOn?.price || 0,
+          quantity: 1,
+        };
+      }),
+    ];
+
     const newBooking: Booking = {
-      date: selectedDate.toDateString(),
+      date: selectedDate.toISOString(),
       service: selectedService,
       addOns: selectedAddOns,
-      pets: selectedPets,
-      totalCost, // Add the total cost to the booking
+      pets: selectedPets.map((id) => pets.find((pet) => pet.id === id)!),
+      totalCost,
+      details,
     };
-  
+
     setBookings((prev) => {
       const existingBookingIndex = prev.findIndex(
-        (b) => b.date === newBooking.date
+        (b) => new Date(b.date).toISOString() === newBooking.date
       );
       if (existingBookingIndex !== -1) {
         const updatedBookings = [...prev];
@@ -143,29 +232,30 @@ export default function CalendarPage() {
       }
       return [...prev, newBooking];
     });
-  
+
     setIsModalOpen(false);
     setError(null);
   };
-  
 
   const handleCheckout = () => {
-    localStorage.setItem('bookings', JSON.stringify(bookings));
+    const newBookings = bookings.filter(
+      (booking) =>
+        !existingBookings.some(
+          (existing) =>
+            existing.date === booking.date &&
+            existing.service === booking.service &&
+            JSON.stringify(existing.addOns) === JSON.stringify(booking.addOns) &&
+            JSON.stringify(existing.pets) === JSON.stringify(booking.pets)
+        )
+    );
+
+    if (newBookings.length === 0) {
+      setError('No new reservations to check out.');
+      return;
+    }
+
+    localStorage.setItem('bookings', JSON.stringify(newBookings));
     router.push('/checkout');
-  };
-
-  const isDateBooked = (date: Date) =>
-    bookings.some((booking) => booking.date === date.toDateString());
-
-  const calculateTotalPrice = () => {
-    return bookings.reduce((total, booking) => {
-      const servicePrice = services.find((s) => s.id === booking.service)?.basePricePerDay || 0;
-      const addOnsPrice = booking.addOns.reduce((sum, addOnId) => {
-        const addOnCost = addOns.find((a) => a.id === addOnId)?.price || 0;
-        return sum + addOnCost;
-      }, 0);
-      return total + servicePrice + addOnsPrice;
-    }, 0).toFixed(2);
   };
 
   return (
@@ -176,13 +266,16 @@ export default function CalendarPage() {
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>
-        Total Price: ${calculateTotalPrice()}
-      </Typography>
-
       <Calendar
         onClickDay={handleDateClick}
-        tileClassName={({ date }) => (isDateBooked(date) ? 'booked-day' : '')}
+        tileClassName={({ date }) => {
+          const booking = bookings.find((b) => new Date(b.date).toDateString() === date.toDateString());
+          if (booking) {
+            return date < new Date() ? 'past-reservation' : 'future-reservation';
+          }
+          return '';
+        }}
+        calendarType="gregory"
       />
 
       <Button
@@ -196,91 +289,105 @@ export default function CalendarPage() {
       </Button>
 
       <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            bgcolor: 'background.paper',
-            p: 4,
-            borderRadius: 2,
-            width: 400,
-            boxShadow: 24,
-          }}
-        >
-          <Typography variant="h6" gutterBottom>
-            Booking Details for {selectedDate?.toDateString()}
-          </Typography>
-          <Typography variant="h6" gutterBottom>
-            Select Service
-          </Typography>
-          {services.map((service) => (
-            <FormControlLabel
-              key={service.id}
-              control={
-                <Checkbox
-                  checked={selectedService === service.id}
-                  onChange={() => setSelectedService(service.id)}
-                />
-              }
-              label={`${service.name} ($${service.basePricePerDay.toFixed(2)})`}
-            />
-          ))}
+  <Box
+    sx={{
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      bgcolor: 'background.paper',
+      p: 4,
+      borderRadius: 2,
+      width: 400,
+      boxShadow: 24,
+    }}
+  >
+    <Typography variant="h6" gutterBottom>
+      Reservation Details for {selectedDate?.toDateString()}
+    </Typography>
 
-          <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-            Select Add-Ons
-          </Typography>
-          {addOns.map((addOn) => (
-            <FormControlLabel
-              key={addOn.id}
-              control={
-                <Checkbox
-                  checked={selectedAddOns.includes(addOn.id)}
-                  onChange={() =>
-                    setSelectedAddOns((prev) =>
-                      prev.includes(addOn.id)
-                        ? prev.filter((id) => id !== addOn.id)
-                        : [...prev, addOn.id]
-                    )
-                  }
-                />
-              }
-              label={`${addOn.name} ($${addOn.price.toFixed(2)})`}
-            />
-          ))}
+    {/* Services */}
+    <Typography variant="h6" gutterBottom>
+      Selected Service
+    </Typography>
+    {services.map((service) => (
+      <FormControlLabel
+        key={service.id}
+        control={
+          <Checkbox
+            checked={selectedService === service.id}
+            onChange={() => setSelectedService(service.id)}
+            disabled={!!(selectedDate && selectedDate < new Date())}
+          />
+        }
+        label={`${service.name} ($${service.basePricePerDay.toFixed(2)})`}
+      />
+    ))}
 
-          <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-            Select Pets
-          </Typography>
-          {pets.map((pet) => (
-            <FormControlLabel
-              key={pet.id}
-              control={
-                <Checkbox
-                  checked={selectedPets.includes(pet.id)}
-                  onChange={() =>
-                    setSelectedPets((prev) =>
-                      prev.includes(pet.id)
-                        ? prev.filter((id) => id !== pet.id)
-                        : [...prev, pet.id]
-                    )
-                  }
-                />
-              }
-              label={pet.name}
-            />
-          ))}
-          <Button
-            variant="contained"
-            color="primary"
-            sx={{ mt: 2 }}
-            onClick={handleSaveBooking}
-          >
-            Save Booking
-          </Button>
-        </Box>
-      </Modal>
+    {/* Add-Ons */}
+    <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+      Selected Add-Ons
+    </Typography>
+    {addOns.map((addOn) => (
+      <FormControlLabel
+        key={addOn.id}
+        control={
+          <Checkbox
+            checked={selectedAddOns.includes(addOn.id)}
+            onChange={() =>
+              setSelectedAddOns((prev) =>
+                prev.includes(addOn.id)
+                  ? prev.filter((id) => id !== addOn.id)
+                  : [...prev, addOn.id]
+              )
+            }
+            disabled={!!(selectedDate && selectedDate < new Date())}
+          />
+        }
+        label={`${addOn.name} ($${addOn.price.toFixed(2)})`}
+      />
+    ))}
+
+    {/* Pets */}
+    <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+      Selected Pets
+    </Typography>
+    {pets.map((pet) => (
+      <FormControlLabel
+        key={pet.id}
+        control={
+          <Checkbox
+            checked={selectedPets.includes(pet.id)}
+            onChange={() =>
+              setSelectedPets((prev) =>
+                prev.includes(pet.id)
+                  ? prev.filter((id) => id !== pet.id)
+                  : [...prev, pet.id]
+              )
+            }
+            disabled={!!(selectedDate && selectedDate < new Date())}
+          />
+        }
+        label={pet.name}
+      />
+    ))}
+
+    {/* Save Button */}
+    {selectedDate && selectedDate >= new Date() && (
+      <Button
+        variant="contained"
+        color="primary"
+        sx={{ mt: 2 }}
+        onClick={handleSaveBooking}
+      >
+        Save Changes
+      </Button>
+    )}
+  </Box>
+</Modal>
+
     </Box>
+
+    
   );
 }

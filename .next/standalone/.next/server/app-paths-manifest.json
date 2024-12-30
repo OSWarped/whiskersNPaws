@@ -1,18 +1,18 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/addons/route": "app/api/addons/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/contact/route": "app/api/contact/route.js",
   "/api/login/route": "app/api/login/route.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/pets/[userId]/route": "app/api/pets/[userId]/route.js",
   "/api/pets/me/route": "app/api/pets/me/route.js",
   "/api/pets/route": "app/api/pets/route.js",
   "/api/register/route": "app/api/register/route.js",
   "/api/reservations/[userId]/route": "app/api/reservations/[userId]/route.js",
   "/api/reservations/route": "app/api/reservations/route.js",
-  "/api/users/route": "app/api/users/route.js",
   "/api/services/route": "app/api/services/route.js",
+  "/api/users/route": "app/api/users/route.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
   "/calendar/page": "app/calendar/page.js",
   "/checkout/page": "app/checkout/page.js",
   "/contact/page": "app/contact/page.js",
@@ -20,6 +20,6 @@
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
   "/register/page": "app/register/page.js",
-  "/services/page": "app/services/page.js",
-  "/reservations/page": "app/reservations/page.js"
+  "/reservations/page": "app/reservations/page.js",
+  "/services/page": "app/services/page.js"
 }

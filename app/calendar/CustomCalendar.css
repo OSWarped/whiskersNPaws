@@ -21,12 +21,33 @@
   }
   
   /* Highlight Booked Days */
-  .booked-day {
-    background-color: #007bff !important; /* Blue background for booked days */
-    color: white !important; /* White text for contrast */
-    font-weight: bold;
-    border-color: #0056b3 !important; /* Darker border for booked days */
-  }
+  
+  /* Highlight Booked Days */
+.booked-day {
+  background-color: #007bff !important;
+  color: white !important;
+  font-weight: bold;
+  border-color: #0056b3 !important;
+}
+
+/* Highlight Past Days */
+.past-day {
+  background-color: #e0e0e0 !important;
+  color: #a0a0a0 !important;
+  text-decoration: line-through;
+}
+.past-reservation {
+  background-color: #3663f8 !important; /* Light gray for past reservations */
+  color: #ffffff !important;
+  cursor: not-allowed;
+}
+
+.future-reservation {
+  background-color: #3663f8 !important; /* Blue for future reservations */
+  color: white !important;
+}
+
+
   
   /* Hover Effect for Days */
   .react-calendar__tile:hover {
@@ -60,5 +81,10 @@
   /* Calendar Weekend Days */
   .react-calendar__month-view__days__day--weekend {
     color: red; /* Optional: Highlight weekends in red */
+  }
+
+  .tooltip {
+    font-size: 0.8rem;
+    color: gray;
   }
   
