@@ -11,12 +11,18 @@ interface DecodedToken {
 
 export async function GET(request: NextRequest) {
   try {
-    const tokenCookie = request.cookies.get('authToken');
-    if (!tokenCookie || !tokenCookie.value) {
+    let token: string | undefined = request.cookies.get('authToken')?.value;
+
+    // Fallback to localStorage token if not found in cookies
+    if (!token) {
+      const storedToken = request.headers.get('x-access-token'); // Pass the token manually if needed
+      token = storedToken || undefined; // Ensure token is string or undefined
+    }
+
+    if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = tokenCookie.value;
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as DecodedToken;
 
     const user = await prisma.user.findUnique({

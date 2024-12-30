@@ -67,7 +67,7 @@ export default function CheckoutPage() {
     setLoading(true);
     setSuccessMessage('');
     setErrorMessage('');
-
+  
     try {
       const token = localStorage.getItem('jwt');
       if (!token) {
@@ -75,16 +75,19 @@ export default function CheckoutPage() {
         setLoading(false);
         return;
       }
-
+  
+      // Ensure correct structure
+      const payload = { bookings };
+  
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ bookings }),
+        body: JSON.stringify(payload),
       });
-
+  
       if (response.ok) {
         setSuccessMessage('Reservations successfully created!');
         localStorage.removeItem('bookings'); // Clear the bookings
@@ -100,6 +103,7 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
+  
 
   return (
     <Box sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>

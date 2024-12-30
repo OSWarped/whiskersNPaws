@@ -1,10 +1,7 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { Calendar, momentLocalizer, SlotInfo } from 'react-big-calendar';
-import moment from 'moment';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
 import {
   Box,
   Typography,
@@ -12,27 +9,30 @@ import {
   Modal,
   Checkbox,
   FormControlLabel,
-  CircularProgress,
+  Alert,
 } from '@mui/material';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css'; // Ensure this is included
+import './CustomCalendar.css'; // Custom styles for booked-day
 
-// Set up the localizer with moment.js
-const localizer = momentLocalizer(moment);
-
-interface CalendarEvent {
-  title: string;
-  start: Date;
-  end: Date;
-  allDay?: boolean;
-  service?: string;
-  addOns?: Record<string, string[]>; // { "2024-12-26": ["Add-On 1", "Add-On 2"] }
-  petIds?: number[];
+interface Booking {
+  date: string; // Use string for date comparison
+  service: string;
+  addOns: string[];
+  pets: number[];
+  totalCost: number;
 }
 
 interface Service {
   id: string;
   name: string;
-  description: string;
   basePricePerDay: number;
+}
+
+interface AddOn {
+  id: string;
+  name: string;
+  price: number;
 }
 
 interface Pet {
@@ -41,334 +41,241 @@ interface Pet {
   type: string;
 }
 
-const addOns = [
-  { id: 'bathing', name: 'Bathing', cost: 5 },
-  { id: 'grooming', name: 'Grooming', cost: 10 },
-];
-
 export default function CalendarPage() {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
-  
-  const [selectedSlot, setSelectedSlot] = useState<SlotInfo | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
-  const [addOnsPerDay, setAddOnsPerDay] = useState<Record<string, string[]>>(
-    {}
-  );
-  const [selectedPetIds, setSelectedPetIds] = useState<number[]>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [selectedPets, setSelectedPets] = useState<number[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [editingEventIndex, setEditingEventIndex] = useState<number | null>(
-    null
-  );
-
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Fetch services and pets from APIs
+  // Fetch resources (services, add-ons, pets)
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchResources = async () => {
       try {
         const token = localStorage.getItem('jwt');
-        if (!token) {
-          console.error('No JWT found. Please log in.');
-          return;
-        }
+        if (!token) throw new Error('Authorization token not found');
 
-        const [servicesResponse, petsResponse] = await Promise.all([
+        const [servicesRes, addOnsRes, petsRes] = await Promise.all([
           fetch('/api/services'),
+          fetch('/api/addons'),
           fetch('/api/pets/me', {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
 
-        if (!servicesResponse.ok) {
-          console.error('Failed to fetch services:', await servicesResponse.json());
-          return;
+        if (!servicesRes.ok || !addOnsRes.ok || !petsRes.ok) {
+          throw new Error('Failed to fetch one or more resources');
         }
 
-        if (!petsResponse.ok) {
-          console.error('Failed to fetch pets:', await petsResponse.json());
-          return;
-        }
-
-        const [servicesData, petsData] = await Promise.all([
-          servicesResponse.json(),
-          petsResponse.json(),
+        const [servicesData, addOnsData, petsData] = await Promise.all([
+          servicesRes.json(),
+          addOnsRes.json(),
+          petsRes.json(),
         ]);
 
         setServices(servicesData);
+        setAddOns(addOnsData);
         setPets(petsData);
       } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching resources:', error);
+        setError('Unable to load resources. Please try again.');
       }
     };
 
-    fetchData();
+    fetchResources();
   }, []);
 
-  const handleSelectSlot = (slotInfo: SlotInfo) => {
-    const selectedDate = moment(slotInfo.start).startOf('day').toDate();
-    setSelectedSlot({
-      start: selectedDate,
-      end: selectedDate,
-      slots: [selectedDate],
-      action: 'click',
-    });
-    setSelectedService(null);
-    setAddOnsPerDay({});
-    setSelectedPetIds([]);
-    setEditingEventIndex(null);
-    setIsModalOpen(true);
-  };
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date);
 
-  const handleSelectEvent = (event: CalendarEvent, index: number) => {
-    setSelectedSlot({
-      start: event.start,
-      end: event.end,
-      slots: [event.start],
-      action: 'click',
-    });
-    setSelectedService(event.service || null);
-    setAddOnsPerDay(event.addOns || {});
-    setSelectedPetIds(event.petIds || []);
-    setEditingEventIndex(index);
-    setIsModalOpen(true);
-  };
-
-  const handleServiceChange = (serviceId: string) => {
-    setSelectedService(serviceId);
-  };
-
-  const handleAddOnChange = (addOnId: string) => {
-    setAddOnsPerDay((prev) => {
-      const currentAddOns = prev[selectedSlot?.start.toISOString() || ''] || [];
-      return {
-        ...prev,
-        [selectedSlot?.start.toISOString() || '']: currentAddOns.includes(addOnId)
-          ? currentAddOns.filter((id) => id !== addOnId)
-          : [...currentAddOns, addOnId],
-      };
-    });
-  };
-
-  const handlePetSelection = (petId: number) => {
-    setSelectedPetIds((prev) =>
-      prev.includes(petId)
-        ? prev.filter((id) => id !== petId)
-        : [...prev, petId]
+    const booking = bookings.find(
+      (b) => b.date === date.toDateString()
     );
-  };
-
-  const calculateTotal = () => {
-    let total = 0;
-
-    events.forEach((event) => {
-      const service = services.find((s) => s.id === event.service);
-      if (!service) return;
-
-      const days =
-        Math.ceil(
-          (new Date(event.end).getTime() - new Date(event.start).getTime()) /
-            (1000 * 60 * 60 * 24)
-        ) + 1;
-
-      const addOnCosts = Object.entries(event.addOns || {}).reduce(
-        (sum, [, addOnIds]) => {
-          return (
-            sum +
-            addOnIds.reduce((addOnSum, addOnId) => {
-              const addOn = addOns.find((a) => a.id === addOnId);
-              return addOn ? addOnSum + addOn.cost : addOnSum;
-            }, 0)
-          );
-        },
-        0
-      );
-
-      total += service.basePricePerDay * days + addOnCosts;
-    });
-
-    return total.toFixed(2);
-  };
-
-  const handleSaveEvent = () => {
-    if (!selectedSlot || !selectedService || selectedPetIds.length === 0) return;
-
-    const updatedEvent: CalendarEvent = {
-      title: `Booking (${services.find((s) => s.id === selectedService)?.name})`,
-      start: selectedSlot.start,
-      end: selectedSlot.end,
-      allDay: true,
-      service: selectedService,
-      petIds: selectedPetIds,
-      addOns: {
-        [moment(selectedSlot.start).format('YYYY-MM-DD')]:
-          addOnsPerDay[moment(selectedSlot.start).format('YYYY-MM-DD')] || [],
-      },
-    };
-
-    if (editingEventIndex !== null) {
-      setEvents((prev) =>
-        prev.map((event, index) =>
-          index === editingEventIndex ? updatedEvent : event
-        )
-      );
+    if (booking) {
+      setSelectedService(booking.service);
+      setSelectedAddOns(booking.addOns);
+      setSelectedPets(booking.pets);
     } else {
-      setEvents((prev) => [...prev, updatedEvent]);
+      setSelectedService(null);
+      setSelectedAddOns([]);
+      setSelectedPets([]);
     }
 
+    setIsModalOpen(true);
+  };
+
+  const handleSaveBooking = () => {
+    if (!selectedDate || !selectedService || selectedPets.length === 0) {
+      setError('Please select a service and at least one pet.');
+      return;
+    }
+  
+    // Calculate total cost
+    const service = services.find((s) => s.id === selectedService);
+    const addOnsCost = selectedAddOns.reduce((sum, addOnId) => {
+      const addOn = addOns.find((a) => a.id === addOnId);
+      return sum + (addOn?.price || 0);
+    }, 0);
+    const totalCost = (service?.basePricePerDay || 0) + addOnsCost;
+  
+    const newBooking: Booking = {
+      date: selectedDate.toDateString(),
+      service: selectedService,
+      addOns: selectedAddOns,
+      pets: selectedPets,
+      totalCost, // Add the total cost to the booking
+    };
+  
+    setBookings((prev) => {
+      const existingBookingIndex = prev.findIndex(
+        (b) => b.date === newBooking.date
+      );
+      if (existingBookingIndex !== -1) {
+        const updatedBookings = [...prev];
+        updatedBookings[existingBookingIndex] = newBooking;
+        return updatedBookings;
+      }
+      return [...prev, newBooking];
+    });
+  
     setIsModalOpen(false);
+    setError(null);
+  };
+  
+
+  const handleCheckout = () => {
+    localStorage.setItem('bookings', JSON.stringify(bookings));
+    router.push('/checkout');
+  };
+
+  const isDateBooked = (date: Date) =>
+    bookings.some((booking) => booking.date === date.toDateString());
+
+  const calculateTotalPrice = () => {
+    return bookings.reduce((total, booking) => {
+      const servicePrice = services.find((s) => s.id === booking.service)?.basePricePerDay || 0;
+      const addOnsPrice = booking.addOns.reduce((sum, addOnId) => {
+        const addOnCost = addOns.find((a) => a.id === addOnId)?.price || 0;
+        return sum + addOnCost;
+      }, 0);
+      return total + servicePrice + addOnsPrice;
+    }, 0).toFixed(2);
   };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h4" gutterBottom align="center">
+    <Box sx={{ p: 4 }}>
+      <Typography variant="h4" align="center" gutterBottom>
         Book Your Pet Sitting Dates
       </Typography>
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Total: ${calculateTotal()}
+
+      {error && <Alert severity="error">{error}</Alert>}
+
+      <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>
+        Total Price: ${calculateTotalPrice()}
       </Typography>
+
       <Calendar
-        localizer={localizer}
-        events={events}
-        selectable
-        defaultView="month"
-        views={['month']}
-        style={{ height: 500, margin: '20px 0' }}
-        onSelectSlot={handleSelectSlot}
-        onSelectEvent={(event) =>
-          handleSelectEvent(event as CalendarEvent, events.indexOf(event))
-        }
+        onClickDay={handleDateClick}
+        tileClassName={({ date }) => (isDateBooked(date) ? 'booked-day' : '')}
       />
 
       <Button
         variant="contained"
         color="primary"
         sx={{ mt: 4 }}
-        onClick={() => {
-          const enrichedBookings = events.map((event) => {
-            const service = services.find((s) => s.id === event.service);
-            const serviceCost = service ? service.basePricePerDay : 0;
-
-            const addOnCost = Object.entries(event.addOns || {}).reduce(
-              (sum, [, addOnIds]) =>
-                sum +
-                addOnIds.reduce((subSum, addOnId) => {
-                  const addOn = addOns.find((a) => a.id === addOnId);
-                  return addOn ? subSum + addOn.cost : subSum;
-                }, 0),
-              0
-            );
-
-            const totalCost = serviceCost + addOnCost;
-
-            return {
-              ...event,
-              serviceBasePricePerDay: serviceCost,
-              totalCost,
-            };
-          });
-
-          localStorage.setItem('bookings', JSON.stringify(enrichedBookings));
-          router.push('/checkout');
-        }}
+        onClick={handleCheckout}
+        disabled={bookings.length === 0}
       >
-        Go to Checkout
+        Checkout
       </Button>
 
-      <Modal
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        aria-labelledby="service-selection-modal"
-        aria-describedby="service-selection-description"
-      >
+      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <Box
           sx={{
             position: 'absolute',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: 400,
             bgcolor: 'background.paper',
-            boxShadow: 24,
             p: 4,
             borderRadius: 2,
+            width: 400,
+            boxShadow: 24,
           }}
         >
           <Typography variant="h6" gutterBottom>
-            {editingEventIndex !== null
-              ? `Edit Booking (${moment(selectedSlot?.start).format(
-                  'YYYY-MM-DD'
-                )})`
-              : `New Booking (${moment(selectedSlot?.start).format(
-                  'YYYY-MM-DD'
-                )})`}
+            Booking Details for {selectedDate?.toDateString()}
           </Typography>
-          {loading ? (
-            <CircularProgress />
-          ) : (
-            <>
-              {services.map((service) => (
-                <FormControlLabel
-                  key={service.id}
-                  control={
-                    <Checkbox
-                      checked={selectedService === service.id}
-                      onChange={() => handleServiceChange(service.id)}
-                    />
-                  }
-                  label={`${service.name} ($${service.basePricePerDay}/day)`}
+          <Typography variant="h6" gutterBottom>
+            Select Service
+          </Typography>
+          {services.map((service) => (
+            <FormControlLabel
+              key={service.id}
+              control={
+                <Checkbox
+                  checked={selectedService === service.id}
+                  onChange={() => setSelectedService(service.id)}
                 />
-              ))}
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                Select Pets
-              </Typography>
-              {pets.map((pet) => (
-                <FormControlLabel
-                  key={pet.id}
-                  control={
-                    <Checkbox
-                      checked={selectedPetIds.includes(pet.id)}
-                      onChange={() => handlePetSelection(pet.id)}
-                    />
+              }
+              label={`${service.name} ($${service.basePricePerDay.toFixed(2)})`}
+            />
+          ))}
+
+          <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+            Select Add-Ons
+          </Typography>
+          {addOns.map((addOn) => (
+            <FormControlLabel
+              key={addOn.id}
+              control={
+                <Checkbox
+                  checked={selectedAddOns.includes(addOn.id)}
+                  onChange={() =>
+                    setSelectedAddOns((prev) =>
+                      prev.includes(addOn.id)
+                        ? prev.filter((id) => id !== addOn.id)
+                        : [...prev, addOn.id]
+                    )
                   }
-                  label={`${pet.name} (${pet.type})`}
                 />
-              ))}
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                Add-Ons
-              </Typography>
-              {addOns.map((addOn) => (
-                <FormControlLabel
-                  key={addOn.id}
-                  control={
-                    <Checkbox
-                      checked={
-                        addOnsPerDay[
-                          moment(selectedSlot?.start).format('YYYY-MM-DD') || ''
-                        ]?.includes(addOn.id) || false
-                      }
-                      onChange={() =>
-                        handleAddOnChange(addOn.id)
-                      }
-                    />
+              }
+              label={`${addOn.name} ($${addOn.price.toFixed(2)})`}
+            />
+          ))}
+
+          <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+            Select Pets
+          </Typography>
+          {pets.map((pet) => (
+            <FormControlLabel
+              key={pet.id}
+              control={
+                <Checkbox
+                  checked={selectedPets.includes(pet.id)}
+                  onChange={() =>
+                    setSelectedPets((prev) =>
+                      prev.includes(pet.id)
+                        ? prev.filter((id) => id !== pet.id)
+                        : [...prev, pet.id]
+                    )
                   }
-                  label={`${addOn.name} ($${addOn.cost})`}
                 />
-              ))}
-            </>
-          )}
+              }
+              label={pet.name}
+            />
+          ))}
           <Button
             variant="contained"
             color="primary"
-            onClick={handleSaveEvent}
             sx={{ mt: 2 }}
+            onClick={handleSaveBooking}
           >
             Save Booking
           </Button>
