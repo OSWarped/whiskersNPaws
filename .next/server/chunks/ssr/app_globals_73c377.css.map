@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file:///Users/blakemilam/Projects/whiskersNPaws/app/globals.css"],"sourcesContent":["/* Avoid overwriting Material-UI defaults */\nhtml, body {\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n}\n\n/* Retain styles for specific components, if necessary */\na {\n  text-decoration: none;\n  color: inherit;\n}\n"],"names":[],"mappings":"AACA;;;;;;AAOA"}},
+    {"offset": {"line": 11, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}}]
+}
