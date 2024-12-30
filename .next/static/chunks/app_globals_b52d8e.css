@@ -1,0 +1,13 @@
+/* [project]/app/globals.css [app-client] (css) */
+html, body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/*# sourceMappingURL=app_globals_b52d8e.css.map*/
