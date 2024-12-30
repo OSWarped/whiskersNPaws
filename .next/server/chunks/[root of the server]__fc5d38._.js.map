@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 63, "column": 0}, "map": {"version":3,"sources":["file:///Users/blakemilam/Projects/whiskersNPaws/app/api/services/route.ts"],"sourcesContent":["import { NextResponse } from 'next/server';\nimport { PrismaClient } from '@prisma/client';\n\nconst prisma = new PrismaClient();\n\nexport async function GET() {\n  try {\n    const services = await prisma.service.findMany({\n      select: {\n        id: true,\n        name: true,\n        description: true,\n        basePricePerDay: true,\n      },\n    });\n    return NextResponse.json(services, { status: 200 });\n  } catch (error) {\n    console.error('Error fetching services:', error);\n    return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 });\n  }\n}\n"],"names":[],"mappings":";;;AAAA;AACA;;;AAEA,MAAM,SAAS,IAAI,6HAAA,CAAA,eAAY;AAExB,eAAe;IACpB,IAAI;QACF,MAAM,WAAW,MAAM,OAAO,OAAO,CAAC,QAAQ,CAAC;YAC7C,QAAQ;gBACN,IAAI;gBACJ,MAAM;gBACN,aAAa;gBACb,iBAAiB;YACnB;QACF;QACA,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC,UAAU;YAAE,QAAQ;QAAI;IACnD,EAAE,OAAO,OAAO;QACd,QAAQ,KAAK,CAAC,4BAA4B;QAC1C,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC;YAAE,OAAO;QAA2B,GAAG;YAAE,QAAQ;QAAI;IAChF;AACF"}},
+    {"offset": {"line": 93, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}}]
+}
