@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { bookings }: { bookings: { date: string; totalCost: number; service: string; addOns: string[]; pets: Pet[] }[] } = await request.json();
+    const { bookings }: { bookings: { startDate: string; totalCost: number; service: number; addOns: number[]; pets: Pet[] }[] } = await request.json();
 
     if (!bookings || !Array.isArray(bookings) || bookings.length === 0) {
       return NextResponse.json(
@@ -96,25 +96,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch addOns from the database to use for price calculation
     const availableAddOns = await prisma.addOn.findMany();
 
     const createdReservations = await Promise.all(
       bookings.map(async (booking) => {
-        if (!booking.date || !booking.totalCost || !booking.service) {
+        if (!booking.startDate || !booking.totalCost || !booking.service) {
           throw new Error('Invalid booking data');
         }
 
-        // Extract pet IDs from the pets array
         const petIds = booking.pets.map((pet) => pet.id);
 
-        // Create the reservation
         const reservation = await prisma.reservation.create({
           data: {
             userId,
             totalPrice: booking.totalCost,
-            startDate: new Date(booking.date),
-            endDate: new Date(booking.date), // Assuming single-day reservations
+            startDate: new Date(booking.startDate),
+            endDate: new Date(booking.startDate),
             pets: {
               connect: petIds.map((id) => ({ id })),
             },
@@ -122,50 +119,26 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Create reservation details (service + add-ons)
         const detailsData = [
           {
             reservationId: reservation.id,
-            serviceId: Number(booking.service), // Ensure serviceId is a number
-            price: booking.totalCost, // Include the base service price
+            serviceId: booking.service,
+            price: booking.totalCost,
           },
           ...booking.addOns.map((addOnId) => ({
             reservationId: reservation.id,
-            addOnId: Number(addOnId), // Convert addOnId to a number
-            price: availableAddOns.find((a) => a.id === Number(addOnId))?.price || 0,
+            addOnId,
+            price: availableAddOns.find((a) => a.id === addOnId)?.price || 0,
           })),
         ];
-        
-        // Ensure detailsData is properly typed
-        const formattedDetailsData = detailsData.map((detail) => {
-          if ('serviceId' in detail) {
-            return {
-              ...detail,
-              serviceId: detail.serviceId, // serviceId exists in this case
-              addOnId: undefined, // Prisma requires undefined for missing fields
-            };
-          } else if ('addOnId' in detail) {
-            return {
-              ...detail,
-              serviceId: undefined, // Prisma requires undefined for missing fields
-              addOnId: detail.addOnId, // addOnId exists in this case
-            };
-          }
-          throw new Error('Invalid detail object'); // Fallback for unexpected cases
-        });
-        
-        await prisma.reservationDetail.createMany({
-          data: formattedDetailsData,
-        });
-        
-        
-        await prisma.reservationDetail.createMany({
-          data: formattedDetailsData,
-        });
-        
 
         await prisma.reservationDetail.createMany({
-          data: detailsData,
+          data: detailsData.map((detail) => ({
+            reservationId: detail.reservationId,
+            serviceId: 'serviceId' in detail ? detail.serviceId : undefined,
+            addOnId: 'addOnId' in detail ? detail.addOnId : undefined,
+            price: detail.price,
+          })),
         });
 
         return reservation;
@@ -174,24 +147,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(createdReservations, { status: 201 });
   } catch (error: unknown) {
-    if (error instanceof SyntaxError) {
-      console.error('Error creating reservations:', error.message);
-      return NextResponse.json(
-        { message: 'Invalid JSON payload.' },
-        { status: 400 }
-      );
-    } else if (error instanceof Error) {
-      console.error('Error creating reservations:', error.message);
-      return NextResponse.json(
-        { message: error.message },
-        { status: 500 }
-      );
-    } else {
-      console.error('Unexpected error:', error);
-      return NextResponse.json(
-        { message: 'Internal server error.' },
-        { status: 500 }
-      );
-    }
+    console.error('Error creating reservations:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error.';
+    return NextResponse.json({ message }, { status: 500 });
   }
 }
