@@ -27,25 +27,27 @@ export default function Header() {
           setIsLoggedIn(false);
           return;
         }
-
+  
         const response = await fetch('/api/auth/me', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
-
-        if (response.ok) {
-          setIsLoggedIn(true);
-        } else {
-          setIsLoggedIn(false);
-        }
+  
+        setIsLoggedIn(response.ok);
       } catch (error) {
         console.error('Error checking auth status:', error);
         setIsLoggedIn(false);
       }
     };
-
+  
     checkAuthStatus();
-  }, []); // Run once on mount
+  
+    // Listen for custom login/logout events
+    const handleAuthChange = () => checkAuthStatus();
+    window.addEventListener('authChanged', handleAuthChange);
+  
+    return () => window.removeEventListener('authChanged', handleAuthChange);
+  }, []);
 
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
     if (event.type === 'keydown' && ((event as React.KeyboardEvent).key === 'Tab' || (event as React.KeyboardEvent).key === 'Shift')) {
@@ -57,6 +59,8 @@ export default function Header() {
   const handleLogout = () => {
     localStorage.removeItem('jwt'); // Remove JWT from localStorage
     setIsLoggedIn(false); // Immediately update state
+    // After login/logout
+    window.dispatchEvent(new Event('authChanged'));
     window.location.href = '/login'; // Redirect to login page
   };
 

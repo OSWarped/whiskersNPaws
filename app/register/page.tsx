@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Box, Typography, TextField, Button, Alert } from '@mui/material';
+import { useRouter } from 'next/navigation'; // ✅ Correct for App Router
+
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -20,6 +22,7 @@ export default function RegisterPage() {
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -57,7 +60,13 @@ export default function RegisterPage() {
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        const { token } = await response.json();
+        localStorage.setItem('jwt', token);
+        window.dispatchEvent(new Event('authChanged')); // ✅ updates header
+        setTimeout(() => router.push('/dashboard'), 100); // ✅ routes to dashboard
+      }
+      else {
         const errorData = await response.json();
         setError(errorData.message || 'Failed to register.');
         return;
