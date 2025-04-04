@@ -61,11 +61,14 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = Cookies.get('authToken') || localStorage.getItem('jwt') || undefined;
+        const token = localStorage.getItem('jwt') || undefined;
 
         if (!token) {
           throw new Error('No authentication token found');
         }
+
+        console.log('JWT token in dashboard page:', localStorage.getItem('jwt'));
+
 
         // Fetch user info
         const userResponse = await fetch('/api/auth/me', {

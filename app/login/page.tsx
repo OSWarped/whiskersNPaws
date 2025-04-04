@@ -41,6 +41,9 @@ export default function LoginPage() {
         localStorage.setItem('jwt', data.token);
   
         console.log('Token saved to cookie and localStorage:', data.token);
+
+        // After login/logout
+        window.dispatchEvent(new Event('authChanged'));     
   
         // Redirect to the dashboard
         router.push('/dashboard');

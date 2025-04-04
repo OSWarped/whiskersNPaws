@@ -124,15 +124,18 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$jsonwebtoken
 ;
 async function GET(request) {
     try {
-        let token = request.cookies.get('authToken')?.value;
-        // Fallback to localStorage token if not found in cookies
-        if (!token) {
-            const storedToken = request.headers.get('x-access-token'); // Pass the token manually if needed
-            token = storedToken || undefined; // Ensure token is string or undefined
+        // ✅ Use Authorization header first
+        const authHeader = request.headers.get('authorization');
+        let token;
+        if (authHeader?.startsWith('Bearer ')) {
+            token = authHeader.split(' ')[1];
+        } else {
+            // ✅ Only fallback to cookie if no header
+            token = request.cookies.get('authToken')?.value;
         }
         if (!token) {
             return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-                message: 'Unauthorized'
+                message: 'Unauthorized - No token found'
             }, {
                 status: 401
             });
@@ -160,9 +163,9 @@ async function GET(request) {
     } catch (error) {
         console.error('Error fetching user:', error);
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
-            message: 'Internal server error'
+            message: 'Invalid or expired token'
         }, {
-            status: 500
+            status: 401
         });
     }
 }
