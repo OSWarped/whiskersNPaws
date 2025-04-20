@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
     const payload = {
       id: user.id,
       email: user.email,
+      isAdmin: user.isAdmin
     };
 
     console.log('JWT payload:', payload);

@@ -5,8 +5,10 @@ import jwt from 'jsonwebtoken';
 interface DecodedToken {
   id: number;
   email: string;
+  isAdmin: boolean,
   iat: number;
   exp: number;
+
 }
 
 export async function GET(request: NextRequest) {
@@ -35,6 +37,7 @@ export async function GET(request: NextRequest) {
         firstName: true,
         lastName: true,
         email: true,
+        isAdmin: true,
       },
     });
 

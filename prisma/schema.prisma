@@ -23,6 +23,9 @@ model User {
   longitude    Float?
   pets         Pet[]
   reservations Reservation[]
+  pendingReservations PendingReservation[]
+  isAdmin Boolean @default(false)
+  isActive  Boolean @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -88,6 +91,17 @@ model ReservationDetail {
   service       Service? @relation(fields: [serviceId], references: [id])
   addOn         AddOn?   @relation(fields: [addOnId], references: [id])
 }
+
+model PendingReservation {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  data      Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  bookings  String   
+}
+
 
 model TravelCost {
   id           Int      @id @default(autoincrement())

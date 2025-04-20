@@ -1,9 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 63, "column": 0}, "map": {"version":3,"sources":["file:///Users/blakemilam/Projects/whiskersNPaws/lib/prisma.ts"],"sourcesContent":["import { PrismaClient } from '@prisma/client';\n\nconst globalForPrisma = global as unknown as { prisma?: PrismaClient };\n\nexport const prisma =\n  globalForPrisma.prisma ||\n  new PrismaClient({\n    log: ['query'], // Optional: Logs Prisma queries in development\n  });\n\nif (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;\n\nexport default prisma;\n"],"names":[],"mappings":";;;;AAAA;;AAEA,MAAM,kBAAkB;AAEjB,MAAM,SACX,gBAAgB,MAAM,IACtB,IAAI,6HAAA,CAAA,eAAY,CAAC;IACf,KAAK;QAAC;KAAQ;AAChB;AAEF,wCAA2C,gBAAgB,MAAM,GAAG;uCAErD"}},
-    {"offset": {"line": 77, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}},
-    {"offset": {"line": 83, "column": 0}, "map": {"version":3,"sources":["file:///Users/blakemilam/Projects/whiskersNPaws/app/api/addons/route.ts"],"sourcesContent":["import { NextResponse } from 'next/server';\nimport prisma from '@/lib/prisma';\n\nexport async function GET() {\n  try {\n    const addons = await prisma.addOn.findMany();\n    return NextResponse.json(addons);\n  } catch {\n    return NextResponse.json({ error: 'Failed to fetch add-ons' }, { status: 500 });\n  }\n}\n"],"names":[],"mappings":";;;AAAA;AACA;;;AAEO,eAAe;IACpB,IAAI;QACF,MAAM,SAAS,MAAM,+GAAA,CAAA,UAAM,CAAC,KAAK,CAAC,QAAQ;QAC1C,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC;IAC3B,EAAE,OAAM;QACN,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC;YAAE,OAAO;QAA0B,GAAG;YAAE,QAAQ;QAAI;IAC/E;AACF"}},
-    {"offset": {"line": 102, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}}]
-}
