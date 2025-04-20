@@ -1,16 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  List,
-  ListItem,
-  Button,
-  Alert,
-  Paper,
-  Grid,
-} from '@mui/material';
 import moment from 'moment';
 
 interface Pet {
@@ -43,158 +33,123 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Fetch bookings from localStorage
     const storedBookings = JSON.parse(localStorage.getItem('bookings') || '[]');
     setBookings(storedBookings);
   }, []);
 
-  const handleMockPayment = async () => {
+  const handleStripeCheckout = async () => {
     setLoading(true);
     setSuccessMessage('');
     setErrorMessage('');
-
+  
     try {
       const token = localStorage.getItem('jwt');
+  
       if (!token) {
-        setErrorMessage('User is not logged in.');
+        setErrorMessage('You must be logged in to continue.');
         setLoading(false);
         return;
       }
-
-      const payload = { bookings };
-
-      const response = await fetch('/api/reservations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
+  
+      // 🔐 Fetch user details to get user ID
+      const userRes = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (response.ok) {
-        setSuccessMessage('Reservations successfully created!');
-        localStorage.removeItem('bookings');
-        setBookings([]);
+  
+      if (!userRes.ok) {
+        setErrorMessage('Unable to retrieve user info.');
+        setLoading(false);
+        return;
+      }
+  
+      const user = await userRes.json();
+  
+      // 🚀 Start Stripe Checkout with bookings and userId
+      const res = await fetch('/api/checkout-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookings, userId: user.id }),
+      });
+  
+      if (!res.ok) {
+        setErrorMessage('Failed to initiate payment. Please try again.');
+        setLoading(false);
+        return;
+      }
+  
+      const data = await res.json();
+  
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        const errorData = await response.json();
-        setErrorMessage(errorData.message || 'Failed to create reservations.');
+        setErrorMessage('Stripe Checkout URL was not returned.');
       }
     } catch (error) {
-      console.error('Error creating reservations:', error);
-      setErrorMessage('An unexpected error occurred. Please try again.');
+      console.error(error);
+      setErrorMessage('Something went wrong while creating the checkout session.');
     } finally {
       setLoading(false);
     }
   };
+  
 
   return (
-    <Box sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h4" gutterBottom align="center">
-        Checkout
-      </Typography>
+    <div className="container py-5">
+      <h2 className="text-center mb-4">Checkout</h2>
+
       {successMessage && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {successMessage}
-        </Alert>
+        <div className="alert alert-success">{successMessage}</div>
       )}
+
       {errorMessage && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {errorMessage}
-        </Alert>
+        <div className="alert alert-danger">{errorMessage}</div>
       )}
+
       {bookings.length === 0 ? (
-        <Typography variant="body1" align="center">
-          No bookings to display.
-        </Typography>
+        <p className="text-center">No bookings to display.</p>
       ) : (
         bookings.map((booking, index) => (
-          <Paper
-            key={index}
-            elevation={3}
-            sx={{
-              p: 3,
-              mb: 3,
-              borderRadius: 2,
-              backgroundColor: '#f9f9f9',
-            }}
-          >
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="h6" gutterBottom>
-                  Date
-                </Typography>
-                <Typography variant="body1">
-                  {moment(booking.date).format('MMMM Do, YYYY')}
-                </Typography>
-              </Grid>
-               
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Pets
-                </Typography>
-                <List disablePadding sx={{ pl: 2 }}>
-                  {booking.pets.length > 0 ? (
-                    booking.pets.map((pet) => (
-                      <ListItem
-                        key={pet.id}
-                        sx={{
-                          display: 'block',
-                          pl: 0,
-                          pb: 2,
-                        }}
-                      >
-                        <Typography variant="body2">
-                          <strong>Name:</strong> {pet.name}
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>Type:</strong> {pet.type}
-                          {pet.breed ? ` - ${pet.breed}` : ''}
-                        </Typography>
-                        {pet.specialNeeds && (
-                          <Typography variant="body2">
-                            <strong>Special Needs:</strong> {pet.specialNeeds}
-                          </Typography>
-                        )}
-                      </ListItem>
-                    ))
-                  ) : (
-                    <ListItem sx={{ display: 'block', pl: 0 }}>
-                      <Typography variant="body2">No pets selected</Typography>
-                    </ListItem>
-                  )}
-                </List>
-              </Grid>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Add-Ons
-                </Typography>
-                <Typography variant="body1">
-                  {booking.addOns.length > 0 ? booking.addOns.join(', ') : 'No Add-Ons'}
-                </Typography>
-              </Grid>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Total Cost
-                </Typography>
-                <Typography variant="body1">
-                  ${booking.totalCost.toFixed(2)}
-                </Typography>
-              </Grid>
-            </Grid>
-          </Paper>
+          <div className="card mb-4 shadow-sm" key={index}>
+            <div className="card-body">
+              <h5 className="card-title">
+                Reservation Date: {moment(booking.date).format('MMMM Do, YYYY')}
+              </h5>
+              <p><strong>Service:</strong> {booking.service}</p>
+              <p><strong>Add-Ons:</strong> {booking.addOns.length > 0 ? booking.addOns.join(', ') : 'None'}</p>
+              <p><strong>Total:</strong> ${booking.totalCost.toFixed(2)}</p>
+
+              <h6 className="mt-4">Pets</h6>
+              {booking.pets.length === 0 ? (
+                <p>No pets selected</p>
+              ) : (
+                <ul className="list-group list-group-flush">
+                  {booking.pets.map((pet) => (
+                    <li className="list-group-item" key={pet.id}>
+                      <strong>{pet.name}</strong> — {pet.type}
+                      {pet.breed && <> ({pet.breed})</>}
+                      {pet.specialNeeds && (
+                        <div className="text-muted small">
+                          Special Needs: {pet.specialNeeds}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         ))
       )}
-      <Button
-        variant="contained"
-        color="primary"
-        fullWidth
-        sx={{ mt: 4, py: 2 }}
-        onClick={handleMockPayment}
-        disabled={loading || bookings.length === 0}
-      >
-        {loading ? 'Processing...' : 'Confirm and Pay'}
-      </Button>
-    </Box>
+
+      <div className="text-center mt-4">
+        <button
+          className="btn btn-primary w-100"
+          onClick={handleStripeCheckout}
+          disabled={loading || bookings.length === 0}
+        >
+          {loading ? 'Redirecting to Stripe...' : 'Confirm and Pay'}
+        </button>
+      </div>
+    </div>
   );
 }

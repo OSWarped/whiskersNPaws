@@ -8,6 +8,9 @@ import createEmotionCache from '@/lib/createEmotionCache';
 import theme from '@/lib/theme';
 import Header from './components/Header';
 import './globals.css';
+// app/layout.tsx or pages/_app.tsx
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // Create a client-side emotion cache
 const clientSideEmotionCache = createEmotionCache();
